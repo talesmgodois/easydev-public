@@ -135,28 +135,37 @@ gitlab_cli() {
   fi
 }
 
-should_run=false
-
-# Get the starting step
+# Get the starting step if specified
 start_from="${1:-}"
+
+# Determine where to start
+start_index=0
 if [[ -n "$start_from" ]]; then
+  # Start from specified step
+  for i in "${!STEP_ORDER[@]}"; do
+    if [[ "${STEP_ORDER[$i]}" == "$start_from" ]]; then
+      start_index=$i
+      break
+    fi
+  done
   echo "$start_from" > "$CHECKPOINT_FILE"
+elif [[ -f "$CHECKPOINT_FILE" ]]; then
+  # Resume from checkpoint
+  checkpoint_step=$(cat "$CHECKPOINT_FILE")
+  for i in "${!STEP_ORDER[@]}"; do
+    if [[ "${STEP_ORDER[$i]}" == "$checkpoint_step" ]]; then
+      start_index=$i
+      break
+    fi
+  done
 fi
 
-for step in "${STEP_ORDER[@]}"; do
-  if [[ ! -f "$CHECKPOINT_FILE" || "$should_run" = true ]]; then
-    echo "🔹 Running step: $step"
-    # Call the function directly by name
-    $step
-    echo "$step" > "$CHECKPOINT_FILE"
-  elif [[ -f "$CHECKPOINT_FILE" && "$(cat "$CHECKPOINT_FILE")" == "$step" ]]; then
-    should_run=true
-    echo "🔹 Resuming from: $step"
-    $step
-    echo "$step" > "$CHECKPOINT_FILE"
-  else
-    echo "⏭️  Skipping $step..."
-  fi
+# Execute steps
+for ((i=start_index; i<${#STEP_ORDER[@]}; i++)); do
+  step="${STEP_ORDER[$i]}"
+  echo "🔹 Running step: $step"
+  $step
+  echo "$step" > "$CHECKPOINT_FILE"
 done
 
 echo "✅ All steps completed."
