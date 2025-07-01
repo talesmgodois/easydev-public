@@ -4,7 +4,6 @@ set -euo pipefail
 
 CHECKPOINT_FILE="$HOME/.mac_devsetup_checkpoint"
 
-declare -A STEP_FUNCS
 declare -a STEP_ORDER=(
   "xcode"
   "homebrew"
@@ -136,29 +135,25 @@ gitlab_cli() {
   fi
 }
 
-# Link function names to labels
-for label in "${STEP_ORDER[@]}"; do
-  STEP_FUNCS[$label]=$label
-done
+should_run=false
 
 # Get the starting step
 start_from="${1:-}"
 if [[ -n "$start_from" ]]; then
-  echo "$start_from" >"$CHECKPOINT_FILE"
+  echo "$start_from" > "$CHECKPOINT_FILE"
 fi
-
-should_run=false
 
 for step in "${STEP_ORDER[@]}"; do
   if [[ ! -f "$CHECKPOINT_FILE" || "$should_run" = true ]]; then
     echo "🔹 Running step: $step"
-    ${STEP_FUNCS[$step]}
-    echo "$step" >"$CHECKPOINT_FILE"
-  elif [[ "$(cat $CHECKPOINT_FILE)" == "$step" ]]; then
+    # Call the function directly by name
+    $step
+    echo "$step" > "$CHECKPOINT_FILE"
+  elif [[ -f "$CHECKPOINT_FILE" && "$(cat "$CHECKPOINT_FILE")" == "$step" ]]; then
     should_run=true
     echo "🔹 Resuming from: $step"
-    ${STEP_FUNCS[$step]}
-    echo "$step" >"$CHECKPOINT_FILE"
+    $step
+    echo "$step" > "$CHECKPOINT_FILE"
   else
     echo "⏭️  Skipping $step..."
   fi
